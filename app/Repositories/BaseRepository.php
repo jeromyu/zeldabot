@@ -28,6 +28,6 @@ class BaseRepository
 
 	public function findByColumns($columns = [])
 	{
-		return $this->model->where($collumns)->first();
+		return $this->model->where($columns)->get();
 	}
 }

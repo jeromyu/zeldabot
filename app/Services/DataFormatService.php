@@ -22,12 +22,12 @@ class DataFormatService
 
 	public function getLinkAndTags($command)
 	{
-		$link = strtok($command, "\<\>\$ ");
+		$link = preg_replace('/\|.*/', '', strtok($command, "\<\>\$ "));
 		$tok = $link;
 		$tags = [];
-
 		while ($tok !== false) {
 			$tok = strtok("\<\> ");
+
 			if ($tok) {
 				$tags[] = $tok;
 			}

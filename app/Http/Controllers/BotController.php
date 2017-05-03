@@ -37,15 +37,18 @@ class BotController extends Controller
         if ($request->input('token') == env('SLACK_APP_TOKEN')) {
             $text = $request->input('text');
 
-            $data = json_encode([
+            $data = [
+                'response_type' => 'ephemeral',
                 'text' => $text . ' @' . $request->input('user_name'),
-            ]);
+            ];
 
             $headers = [
                 'Content-type' =>  'application/json',
             ];
 
-            $this->curl_service->performAction(env('TELEGRAM_WEBHOOK_URL'), 'post', $data, $headers);
+            //$this->curl_service->performAction(env('SLACK_WEBHOOK_URL'), 'post', $data, $headers);
+
+            return response()->json($data, 200);
         }
     }
 
@@ -60,14 +63,27 @@ class BotController extends Controller
         }
 
         $data = $request->all();
+
         $text = $this->format_service->escapeContent($data['text']);
         $command_entities = $this->format_service->getLinkAndTags($text);
+
+        if ($this->link_repository->findByColumns(['url' => $command_entities['link']])->count()) {
+            return response()->json([
+                'response_type' => 'ephemeral',
+                'text' => 'Oops! The link is already added. Try with other link.'
+            ], 200);
+        }
+
+        $tags = array_map(function($element){
+            return '#' . $element;
+        }, $command_entities['tags']);
 
         $headers = [
             'Content-type' => 'application/json',
         ];
 
         $response_data = json_encode([
+            'response_type' => 'in_channel',
             'attachments' => [
                 [
                     'pretext' => $data['user_name'] . ' added a new link.',
@@ -77,13 +93,13 @@ class BotController extends Controller
                     'fields' => [
                         [
                             'title' => 'tags',
-                            'value' => '#php #laravel',
+                            'value' => implode(' ', $tags),
                         ]
                     ],
                     'actions' => [
                         [
                             'name' =>  'favorite',
-                            'text' =>  'Add to favorites',
+                            'text' =>  '★ Add to favorites',
                             'type' =>  'button',
                             'value' =>  '1',
                             'style' => 'primary'
@@ -92,21 +108,74 @@ class BotController extends Controller
                 ]
             ]
         ]);
-/*
+
+
         $user = $this->user_repository->firstOrCreate(['slack_user_id' => $data['user_id'], 'slack_username' => $data['user_name']]);
 
         $link_data = [
             'url' => $command_entities['link'],
             'user_id' => $user->id,
-            'tags' => $this->tag_repository->massFirstOrCreate($command_entities['tags'])
+            'tags' => $this->tag_repository->massFirstOrCreate($tags)
         ];
 
         if ($this->link_repository->save((object) $link_data)) {
-            $this->curl_service->performAction(env('TELEGRAM_WEBHOOK_URL'), 'post', $response_data, $headers);
+            $this->curl_service->performAction(env('SLACK_WEBHOOK_URL'), 'post', $response_data, $headers);
         }
+
+
+        //return $this->curl_service->performAction(env('SLACK_WEBHOOK_URL'), 'post', $response_data, $headers);
     }
-    */
-    $this->curl_service->performAction(env('TELEGRAM_WEBHOOK_URL'), 'post', $response_data, $headers);
+
+    public function myLinks(Request $request)
+    {
+        $data = $request->all();
+
+        $user_links = $this->user_repository->findByColumns(['slack_user_id' => $data['user_id']])->first()->links;
+
+        $attachments = [];
+
+        foreach ($user_links as $link) {
+                $attachments[] = [
+                    //'pretext' => $data['user_name'] . '\'s links:',
+                    'color' => '#1a5dc9',
+                    'fields' => [
+                        [
+                            'title' => 'Added: ' . $link->date,
+                            'value' => $link->url,
+                            'short' => true
+                        ],
+                        [
+                            'title' => 'Tags:',
+                            'value' => implode(' ', $link->tags()->pluck('name')->toArray())
+                        ]
+                    ]
+                    /*
+                    'actions' => [
+                        [
+                            'name' =>  'next',
+                            'text' =>  'Next page >>',
+                            'type' =>  'button',
+                            'value' =>  '1',
+                            'style' => 'primary'
+                        ]
+                    ]
+                    */
+                ];
+        }
+
+        $headers = [
+            'Content-type' => 'application/json',
+        ];
+
+        $response_data = [
+            'response_type' => 'ephemeral',
+            'text' => 'Your links:',
+            'attachments' => $attachments
+        ];
+
+        //$this->curl_service->performAction(env('SLACK_WEBHOOK_URL'), 'post', $response_data, $headers);
+
+        return response()->json($response_data, 200);
     }
 }
 
