@@ -60,18 +60,26 @@ class BotController extends Controller
                 'text' => ['regex:@^<(https?|ftp):\/\/[^\s/$.?#].[^\s]*>((\ .*)+([a-zA-Z0-9]+))*(\ )*@'],
             ]);
         } catch (ValidationException $e) {
-            dd($e->response->original);
+
+            return response()->json([
+                'response_type' => 'ephemeral',
+                'text' => 'Oops! ' . $e->response->original
+            ], 200);
         }
 
         $data = $request->all();
+        $user = $this->user_repository->firstOrCreate(['slack_user_id' => $data['user_id'], 'slack_username' => $data['user_name']]);
 
         $text = $this->format_service->escapeContent($data['text']);
         $command_entities = $this->format_service->getLinkAndTags($text);
 
-        if ($this->link_repository->findByColumns(['url' => $command_entities['link']])->count()) {
+        if ($found_link = $this->link_repository->findByColumns(['url' => $command_entities['link']])->first()) {
+
+            $this->user_repository->addFavorite($user->id, $found_link->id);
+
             return response()->json([
                 'response_type' => 'ephemeral',
-                'text' => 'Oops! The link is already added. Try with other link.'
+                'text' => 'Oops! The link is already added. But it \'s now in your favorites.'
             ], 200);
         }
 
@@ -82,8 +90,6 @@ class BotController extends Controller
         $headers = [
             'Content-type' => 'application/json',
         ];
-
-        $user = $this->user_repository->firstOrCreate(['slack_user_id' => $data['user_id'], 'slack_username' => $data['user_name']]);
 
         $link_data = [
             'url' => $command_entities['link'],
@@ -97,7 +103,7 @@ class BotController extends Controller
         }
 
         $response_data = [
-            'response_type' => 'ephemeral',
+            'response_type' => 'in_channel',
             'attachments' => [
                 [
                     'pretext' => $data['user_name'] . ' added a new link.',
@@ -124,9 +130,9 @@ class BotController extends Controller
             ]
         ];
 
-        //return $this->curl_service->performAction(env('SLACK_WEBHOOK_URL'), 'post', $response_data, $headers);
+        $this->curl_service->performAction(env('SLACK_WEBHOOK_URL'), 'post', json_encode($response_data), $headers);
 
-        return response()->json($response_data, 200);
+        //return response()->json($response_data, 200);
     }
 
     public function myLinks(Request $request)
@@ -235,7 +241,59 @@ class BotController extends Controller
 
         $response_data = [
             'response_type' => 'ephemeral',
-            'text' => 'Your links:',
+            'text' => 'Your favorites:',
+            'attachments' => $attachments
+        ];
+
+        //$this->curl_service->performAction(env('SLACK_WEBHOOK_URL'), 'post', $response_data, $headers);
+
+        return response()->json($response_data, 200);
+    }
+
+    public function all(Request $request)
+    {
+        $data = $request->all();
+
+        $links = $this->link_repository->all();
+
+        $attachments = [];
+
+        foreach ($links as $link) {
+                $attachments[] = [
+                    //'pretext' => $data['user_name'] . '\'s links:',
+                    'color' => '#1a5dc9',
+                    'fields' => [
+                        [
+                            'title' => 'Added: ' . $link->date,
+                            'value' => $link->url,
+                            'short' => true
+                        ],
+                        [
+                            'title' => 'Tags:',
+                            'value' => implode(' ', $link->tags()->pluck('name')->toArray())
+                        ]
+                    ]
+                    /*
+                    'actions' => [
+                        [
+                            'name' =>  'next',
+                            'text' =>  'Next page >>',
+                            'type' =>  'button',
+                            'value' =>  '1',
+                            'style' => 'primary'
+                        ]
+                    ]
+                    */
+                ];
+        }
+
+        $headers = [
+            'Content-type' => 'application/json',
+        ];
+
+        $response_data = [
+            'response_type' => 'ephemeral',
+            'text' => 'All links:',
             'attachments' => $attachments
         ];
 

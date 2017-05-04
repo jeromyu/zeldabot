@@ -23,6 +23,7 @@ class DataFormatService
 	public function getLinkAndTags($command)
 	{
 		$link = preg_replace('/\|.*/', '', strtok($command, "\<\>\$ "));
+		$link = explode('?', $link)[0];
 		$tok = $link;
 		$tags = [];
 		while ($tok !== false) {
