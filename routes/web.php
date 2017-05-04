@@ -19,4 +19,7 @@ $app->group(['middleware' => 'verify.token'], function () use ($app) {
 	$app->post('/webhook', 'BotController@webhook');
 	$app->post('/addlink', 'BotController@addlink');
 	$app->post('/mylinks', 'BotController@myLinks');
+	$app->post('/favorites', 'BotController@favorites');
 });
+
+$app->post('/add-favorite', 'BotController@favoriteButtonAction');

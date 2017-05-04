@@ -37,4 +37,11 @@ class UserRepository extends BaseRepository
 	{
 		return $this->model->firstOrCreate($data, ['created_at' => Carbon::now(), 'updated_at' => Carbon::now()]);
 	}
+
+	public function addFavorite($user_id, $link_id)
+	{
+		$user = $this->model->find($user_id);
+
+		$user->favorites()->attach($link_id, ['created_at' => Carbon::now(), 'updated_at' => Carbon::now()]);
+	}
 }

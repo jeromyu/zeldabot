@@ -9,6 +9,7 @@ use App\Repositories\UserRepository;
 use App\Repositories\LinkRepository;
 use App\Repositories\TagRepository;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Database\QueryException;
 
 class BotController extends Controller
 {
@@ -82,14 +83,28 @@ class BotController extends Controller
             'Content-type' => 'application/json',
         ];
 
-        $response_data = json_encode([
-            'response_type' => 'in_channel',
+        $user = $this->user_repository->firstOrCreate(['slack_user_id' => $data['user_id'], 'slack_username' => $data['user_name']]);
+
+        $link_data = [
+            'url' => $command_entities['link'],
+            'user_id' => $user->id,
+            'tags' => $this->tag_repository->massFirstOrCreate($tags)
+        ];
+
+        if ($link = $this->link_repository->save((object) $link_data)) {
+            //$this->curl_service->performAction(env('SLACK_WEBHOOK_URL'), 'post', json_encode($response_data), $headers);
+            $this->user_repository->addFavorite($user->id, $link->id);
+        }
+
+        $response_data = [
+            'response_type' => 'ephemeral',
             'attachments' => [
                 [
                     'pretext' => $data['user_name'] . ' added a new link.',
                     'color' => '#36a64f',
                     'title' => $command_entities['link'],
                     'title_link' => $command_entities['link'],
+                    'callback_id' => 'link_added',
                     'fields' => [
                         [
                             'title' => 'tags',
@@ -101,29 +116,17 @@ class BotController extends Controller
                             'name' =>  'favorite',
                             'text' =>  '★ Add to favorites',
                             'type' =>  'button',
-                            'value' =>  '1',
+                            'value' =>  $link->id,
                             'style' => 'primary'
                         ]
                     ]
                 ]
             ]
-        ]);
-
-
-        $user = $this->user_repository->firstOrCreate(['slack_user_id' => $data['user_id'], 'slack_username' => $data['user_name']]);
-
-        $link_data = [
-            'url' => $command_entities['link'],
-            'user_id' => $user->id,
-            'tags' => $this->tag_repository->massFirstOrCreate($tags)
         ];
 
-        if ($this->link_repository->save((object) $link_data)) {
-            $this->curl_service->performAction(env('SLACK_WEBHOOK_URL'), 'post', $response_data, $headers);
-        }
-
-
         //return $this->curl_service->performAction(env('SLACK_WEBHOOK_URL'), 'post', $response_data, $headers);
+
+        return response()->json($response_data, 200);
     }
 
     public function myLinks(Request $request)
@@ -160,6 +163,69 @@ class BotController extends Controller
                         ]
                     ]
                     */
+                ];
+        }
+
+        $headers = [
+            'Content-type' => 'application/json',
+        ];
+
+        $response_data = [
+            'response_type' => 'ephemeral',
+            'text' => 'Your links:',
+            'attachments' => $attachments
+        ];
+
+        //$this->curl_service->performAction(env('SLACK_WEBHOOK_URL'), 'post', $response_data, $headers);
+
+        return response()->json($response_data, 200);
+    }
+
+    public function favoriteButtonAction(Request $request)
+    {
+        $data = json_decode($request->get('payload'));
+        $user = $this->user_repository->findByColumns(['slack_user_id' =>  $data->user->id])->first();
+        try {
+            $this->user_repository->addFavorite($user->id, $data->actions[0]->value);
+
+            return response()->json([
+                'response_type' => 'ephemeral',
+                'text' => 'Great! The link has been added to favorites.'
+            ], 200);
+        } catch (QueryException $e) {
+            return response()->json([
+                'response_type' => 'ephemeral',
+                'text' => 'Hey! The link is already added to favorites. See favorite list..'
+            ], 200);
+        }
+    }
+
+    public function favorites(Request $request)
+    {
+        $data = $request->all();
+
+        $favorites = $this->user_repository->findByColumns(['slack_user_id' => $data['user_id']])->first()->favorites;
+
+        $attachments = [];
+
+        foreach ($favorites as $link) {
+            //dd([$link, $link->pivot, $link->pivot->created_at, $link->pivot_created_at]);
+                $added_at = $link->pivot->created_at != null ? date_format($link->pivot->created_at, 'jS F Y') : null;
+                
+                $attachments[] = [
+                    //'pretext' => $data['user_name'] . '\'s links:',
+                    'color' => '#1a5dc9',
+                    'fields' => [
+                        [
+                            'title' => 'Added: ' . $added_at,
+                            'value' => $link->url,
+                            'short' => true
+                        ],
+                        [
+                            'title' => 'Tags:',
+                            'value' => implode(' ', $link->tags()->pluck('name')->toArray())
+                        ]
+                    ]
                 ];
         }
 
