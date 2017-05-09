@@ -38,6 +38,6 @@ class CreateLinksTable extends Migration
             $table->dropForeign(['user_id']);
         });
 
-        Schea::dropIfExists('links');
+        Schema::dropIfExists('links');
     }
 }

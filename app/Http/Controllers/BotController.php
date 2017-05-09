@@ -59,11 +59,16 @@ class BotController extends Controller
             $this->validate($request, [
                 'text' => ['regex:@^<(https?|ftp):\/\/[^\s/$.?#].[^\s]*>((\ .*)+([a-zA-Z0-9]+))*(\ )*@'],
             ]);
+            if (!$request->get('text')) {
+                return response()->json([
+                    'response_type' => 'ephemeral',
+                    'text' => 'Oops! The link is required.'
+                ], 200);
+            }
         } catch (ValidationException $e) {
-
             return response()->json([
                 'response_type' => 'ephemeral',
-                'text' => 'Oops! ' . $e->response->original
+                'text' => 'Oops! ' . implode(". ", $e->response->original['text'])
             ], 200);
         }
 
@@ -74,12 +79,16 @@ class BotController extends Controller
         $command_entities = $this->format_service->getLinkAndTags($text);
 
         if ($found_link = $this->link_repository->findByColumns(['url' => $command_entities['link']])->first()) {
-
-            $this->user_repository->addFavorite($user->id, $found_link->id);
+            if ($user->links->contains('id', $found_link->id)) {
+                $message = 'Oops! The link is already exists in your favorite list.';
+            } else {
+                $this->user_repository->addFavorite($user->id, $found_link->id);
+                $message = 'Oops! The link is already added. But it \'s now in your favorites.';
+            }
 
             return response()->json([
                 'response_type' => 'ephemeral',
-                'text' => 'Oops! The link is already added. But it \'s now in your favorites.'
+                'text' => $message
             ], 200);
         }
 
@@ -139,7 +148,7 @@ class BotController extends Controller
     {
         $data = $request->all();
 
-        $user_links = $this->user_repository->findByColumns(['slack_user_id' => $data['user_id']])->first()->links;
+        $user_links = $this->user_repository->findByColumns(['slack_user_id' => $data['user_id']])->first()->links->sortByDesc('updated_at');
 
         $attachments = [];
 
@@ -210,7 +219,7 @@ class BotController extends Controller
     {
         $data = $request->all();
 
-        $favorites = $this->user_repository->findByColumns(['slack_user_id' => $data['user_id']])->first()->favorites;
+        $favorites = $this->user_repository->findByColumns(['slack_user_id' => $data['user_id']])->first()->favorites()->orderBy('favorites.updated_at', 'desc')->get();
 
         $attachments = [];
 
@@ -254,7 +263,7 @@ class BotController extends Controller
     {
         $data = $request->all();
 
-        $links = $this->link_repository->all();
+        $links = $this->link_repository->all()->sortByDesc('updated_at');
 
         $attachments = [];
 
