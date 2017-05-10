@@ -41,4 +41,17 @@ class DataFormatService
 
 		return $data;
 	}
+
+	public function getTags($command_text)
+	{
+		$arr = explode(" ", preg_replace('/\s+/', " ", $command_text));
+
+		array_walk($arr, function($element, $key) use (&$arr){
+			if (!$element) {
+				unset($arr[$key]);
+			}
+		});
+
+		return $arr;
+	}
 }

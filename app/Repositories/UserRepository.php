@@ -43,5 +43,15 @@ class UserRepository extends BaseRepository
 		$user = $this->model->find($user_id);
 
 		$user->favorites()->attach($link_id, ['created_at' => Carbon::now(), 'updated_at' => Carbon::now()]);
+
+		return $link_id;
+	}
+
+	public function syncTags($user_id, $tag_ids)
+	{
+		$user = $this->model->find($user_id);
+		$user->preferences()->sync($tag_ids);
+
+		return $tag_ids;
 	}
 }

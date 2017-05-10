@@ -19,4 +19,9 @@ class User extends Model
 	{
 		return $this->belongsToMany(Link::class, 'favorites', 'user_id', 'link_id')->withTimestamps();
 	}
+
+	public function preferences()
+	{
+		return $this->belongsToMany(Tag::class, 'preferences', 'user_id', 'tag_id');
+	}
 }

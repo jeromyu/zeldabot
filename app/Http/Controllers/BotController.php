@@ -310,5 +310,32 @@ class BotController extends Controller
 
         return response()->json($response_data, 200);
     }
+
+    public function addPreferences(Request $request)
+    {
+        $data = $request->all();
+        $user = $this->user_repository->firstOrCreate(['slack_user_id' => $data['user_id'], 'slack_username' => $data['user_name']]);
+
+        $text = $this->format_service->escapeContent($data['text']);
+        $tag_words = $this->format_service->getTags($text);
+        $tag_ids = [];
+        if (empty($tag_words)) {
+            return response()->json([
+                'response_type' => 'ephemeral',
+                'text' => 'Oops! Type at least one tag.'
+            ], 200);
+        }
+
+        $tag_ids = $this->tag_repository->massFirstOrCreate($tag_words);
+        $user_tags = $user->preferences()->pluck('id')->toArray();
+        $filtered_tag_ids = array_unique(array_merge($tag_ids, $user_tags));
+
+        $this->user_repository->syncTags($user->id, $filtered_tag_ids);
+
+        return response()->json([
+            'response_type' => 'ephemeral',
+            'text' => 'Fine! Your preferences has been updated.'
+        ], 200);
+    }
 }
 
