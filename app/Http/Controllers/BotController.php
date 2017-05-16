@@ -262,8 +262,27 @@ class BotController extends Controller
     public function all(Request $request)
     {
         $data = $request->all();
-
+/**/
         $links = $this->link_repository->all()->sortByDesc('updated_at');
+        if (trim($data['text'], ' ')) {
+            $text = $this->format_service->escapeContent($data['text']);
+            $tag_words = $this->format_service->getTags($text);
+            $tags_found = \App\Models\Tag::whereIn('name', $tag_words)->pluck('id');
+
+            if ($tags_found->count()) {
+                $links = \App\Models\Link::whereHas('tags', function($query) use ($tags_found){
+                    $query->whereIn('id', $tags_found);
+                })->get();
+            } else {
+                $response_data = [
+                    'response_type' => 'ephemeral',
+                    'text' => 'Oops! There is not links with the specified tag(s).',
+                ];
+
+                return response()->json($response_data, 200);
+            }
+        }
+/**/
 
         $attachments = [];
 
@@ -313,12 +332,14 @@ class BotController extends Controller
 
     public function addPreferences(Request $request)
     {
+        $attachments = [];
         $data = $request->all();
         $user = $this->user_repository->firstOrCreate(['slack_user_id' => $data['user_id'], 'slack_username' => $data['user_name']]);
 
         $text = $this->format_service->escapeContent($data['text']);
         $tag_words = $this->format_service->getTags($text);
         $tag_ids = [];
+
         if (empty($tag_words)) {
             return response()->json([
                 'response_type' => 'ephemeral',
@@ -327,14 +348,30 @@ class BotController extends Controller
         }
 
         $tag_ids = $this->tag_repository->massFirstOrCreate($tag_words);
-        $user_tags = $user->preferences()->pluck('id')->toArray();
+        $user_tags = $user->preferences->pluck('id')->toArray();
         $filtered_tag_ids = array_unique(array_merge($tag_ids, $user_tags));
 
         $this->user_repository->syncTags($user->id, $filtered_tag_ids);
 
+        $user->load('preferences');
+        $prefs = $user->preferences->pluck('name')->transform(function($item, $key){
+            return '#' . $item;
+        });
+
+        $attachments[] = [
+            'color' => '#36a64f',
+            'fields' => [
+                [
+                    'title' => 'Preferences:',
+                    'value' => implode(' - ', $prefs->toArray())
+                ]
+            ]
+        ];
+
         return response()->json([
             'response_type' => 'ephemeral',
-            'text' => 'Fine! Your preferences has been updated.'
+            'text' => 'Fine! Your preferences has been updated.',
+            'attachments' => $attachments
         ], 200);
     }
 }
