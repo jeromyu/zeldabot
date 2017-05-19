@@ -40,4 +40,9 @@ class TagRepository extends BaseRepository
 
 		return $tag_ids;
 	}
+
+	public function getTagsInGroup($tag_names)
+	{
+		return $this->model->whereIn('name', $tag_words)->pluck('id');
+	}
 }

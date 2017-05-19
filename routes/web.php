@@ -22,6 +22,7 @@ $app->group(['middleware' => 'verify.token'], function () use ($app) {
 	$app->post('/favorites', 'BotController@favorites');
 	$app->post('/all', 'BotController@all');
 	$app->post('/preferences', 'BotController@addPreferences');
+	$app->post('/recommendations', 'BotController@getRecommendations');
 });
 
 $app->post('/add-favorite', 'BotController@favoriteButtonAction');

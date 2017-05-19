@@ -267,7 +267,7 @@ class BotController extends Controller
         if (trim($data['text'], ' ')) {
             $text = $this->format_service->escapeContent($data['text']);
             $tag_words = $this->format_service->getTags($text);
-            $tags_found = \App\Models\Tag::whereIn('name', $tag_words)->pluck('id');
+            $tags_found = $this->tag_repository->getTagsInGroup($tag_words);
 
             if ($tags_found->count()) {
                 $links = \App\Models\Link::whereHas('tags', function($query) use ($tags_found){
@@ -373,6 +373,57 @@ class BotController extends Controller
             'text' => 'Fine! Your preferences has been updated.',
             'attachments' => $attachments
         ], 200);
+    }
+
+    public function getRecommendations(Request $request)
+    {
+        $attachments = [];
+        $data = $request->all();
+        $user = $this->user_repository->firstOrCreate(['slack_user_id' => $data['user_id'], 'slack_username' => $data['user_name']]);
+
+        $recommendations = $this->link_repository->recommendations($user->id);
+
+        foreach ($recommendations as $link) {
+                $attachments[] = [
+                    //'pretext' => 'Recommendations based on your preferences:',
+                    'color' => '#1a5dc9',
+                    'callback_id' => 'link_added',
+                    'fields' => [
+                        [
+                            'title' => 'Added: ' . $link->date,
+                            'value' => $link->url,
+                            'short' => true
+                        ],
+                        [
+                            'title' => 'Tags:',
+                            'value' => implode(' ', $link->tags()->pluck('name')->toArray())
+                        ]
+                    ],
+                    'actions' => [
+                        [
+                            'name' =>  'favorite',
+                            'text' =>  '★ Add to favorites',
+                            'type' =>  'button',
+                            'value' =>  $link->id,
+                            'style' => 'primary'
+                        ]
+                    ]
+                ];
+        }
+
+        $headers = [
+            'Content-type' => 'application/json',
+        ];
+
+        $response_data = [
+            'response_type' => 'ephemeral',
+            'text' => 'Recommendations based on your preferences:',
+            'attachments' => $attachments
+        ];
+
+        //$this->curl_service->performAction(env('SLACK_WEBHOOK_URL'), 'post', $response_data, $headers);
+
+        return response()->json($response_data, 200);
     }
 }
 
