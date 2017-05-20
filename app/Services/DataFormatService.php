@@ -4,7 +4,7 @@ namespace App\Services;
 
 class DataFormatService
 {
-	protected $exceptions = ['$'];
+	protected $exceptions = ["$", "'"];
 
 	public function getExceptions()
 	{
@@ -46,12 +46,21 @@ class DataFormatService
 	{
 		$arr = explode(" ", preg_replace('/\s+/', " ", $command_text));
 
-		array_walk($arr, function($element, $key) use (&$arr){
+		array_walk($arr, function(&$element, $key) use (&$arr){
 			if (!$element) {
 				unset($arr[$key]);
+			} else {
+				$element = strtolower($element);
 			}
 		});
 
 		return $arr;
+	}
+
+	public function getHtmlH1Text($html)
+	{
+		preg_match_all('@<h1.*>(.*)<\/h1>@U', $html, $matches);
+
+		return strtolower(implode(' ', $matches[1]));
 	}
 }

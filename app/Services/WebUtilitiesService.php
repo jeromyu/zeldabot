@@ -4,9 +4,9 @@ namespace App\Services;
 
 use Curl\Curl;
 
-class CurlService
+class WebUtilitiesService
 {
-	public function performAction($url, $method, $data = [], $headers = [], $cookies = [])
+	public function performCurlAction($url, $method, $data = [], $headers = [], $cookies = [])
 	{
 		$curl = new Curl();
 		if (!empty($headers)) {
@@ -24,5 +24,10 @@ class CurlService
 		$curl->{$method}($url, $data);
 
 		return $curl->error ? $curl->error_code : $curl->response;
+	}
+
+	public function scrapWeb($url)
+	{
+		return file_get_contents($url);
 	}
 }

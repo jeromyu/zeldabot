@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Services\CurlService;
+use App\Services\WebUtilitiesService;
 use App\Services\DataFormatService;
 use App\Repositories\UserRepository;
 use App\Repositories\LinkRepository;
@@ -19,14 +19,14 @@ class BotController extends Controller
      * @return void
      */
     public function __construct(
-        CurlService $curl_service,
+        WebUtilitiesService $web_service,
         DataFormatService $format_service,
         UserRepository $user_repository,
         LinkRepository $link_repository,
         TagRepository $tag_repository
     )
     {
-        $this->curl_service = $curl_service;
+        $this->web_service = $web_service;
         $this->format_service = $format_service;
         $this->user_repository = $user_repository;
         $this->link_repository = $link_repository;
@@ -47,7 +47,7 @@ class BotController extends Controller
                 'Content-type' =>  'application/json',
             ];
 
-            //$this->curl_service->performAction(env('SLACK_WEBHOOK_URL'), 'post', $data, $headers);
+            //$this->web_service->performCurlAction(env('SLACK_WEBHOOK_URL'), 'post', $data, $headers);
 
             return response()->json($data, 200);
         }
@@ -73,13 +73,14 @@ class BotController extends Controller
         }
 
         $data = $request->all();
+        $auto_added_tags = false;
         $user = $this->user_repository->firstOrCreate(['slack_user_id' => $data['user_id'], 'slack_username' => $data['user_name']]);
 
         $text = $this->format_service->escapeContent($data['text']);
         $command_entities = $this->format_service->getLinkAndTags($text);
 
         if ($found_link = $this->link_repository->findByColumns(['url' => $command_entities['link']])->first()) {
-            if ($user->links->contains('id', $found_link->id)) {
+            if ($user->favorites->contains('id', $found_link->id)) {
                 $message = 'Oops! The link is already exists in your favorite list.';
             } else {
                 $this->user_repository->addFavorite($user->id, $found_link->id);
@@ -92,9 +93,20 @@ class BotController extends Controller
             ], 200);
         }
 
+        if (empty($command_entities['tags'])) {
+            $html = $this->web_service->scrapWeb($command_entities['link']);
+            $key_words = $this->format_service->getHtmlH1Text($html);
+            $tags = $this->format_service->getTags($key_words);
+            $auto_added_tags = true;
+        } else {
+            $tags = $command_entities['tags'];
+        }
+
+/*
         $tags = array_map(function($element){
             return '#' . $element;
         }, $command_entities['tags']);
+        */
 
         $headers = [
             'Content-type' => 'application/json',
@@ -103,13 +115,15 @@ class BotController extends Controller
         $link_data = [
             'url' => $command_entities['link'],
             'user_id' => $user->id,
-            'tags' => $this->tag_repository->massFirstOrCreate($tags)
+            'tags' => $auto_added_tags ? $this->tag_repository->getTagsInGroup($tags) : $this->tag_repository->massFirstOrCreate($tags)
         ];
 
         if ($link = $this->link_repository->save((object) $link_data)) {
-            //$this->curl_service->performAction(env('SLACK_WEBHOOK_URL'), 'post', json_encode($response_data), $headers);
+            //$this->web_service->performCurlAction(env('SLACK_WEBHOOK_URL'), 'post', json_encode($response_data), $headers);
             $this->user_repository->addFavorite($user->id, $link->id);
         }
+
+        $linked_tags = $this->tag_repository->getTagsInIdsGroup($link_data['tags']);
 
         $response_data = [
             'response_type' => 'in_channel',
@@ -123,7 +137,7 @@ class BotController extends Controller
                     'fields' => [
                         [
                             'title' => 'tags',
-                            'value' => implode(' ', $tags),
+                            'value' => implode(' ', $linked_tags),
                         ]
                     ],
                     'actions' => [
@@ -139,7 +153,7 @@ class BotController extends Controller
             ]
         ];
 
-        $this->curl_service->performAction(env('SLACK_WEBHOOK_URL'), 'post', json_encode($response_data), $headers);
+        $this->web_service->performCurlAction(env('SLACK_WEBHOOK_URL'), 'post', json_encode($response_data), $headers);
 
         //return response()->json($response_data, 200);
     }
@@ -191,7 +205,7 @@ class BotController extends Controller
             'attachments' => $attachments
         ];
 
-        //$this->curl_service->performAction(env('SLACK_WEBHOOK_URL'), 'post', $response_data, $headers);
+        //$this->web_service->performCurlAction(env('SLACK_WEBHOOK_URL'), 'post', $response_data, $headers);
 
         return response()->json($response_data, 200);
     }
@@ -254,7 +268,7 @@ class BotController extends Controller
             'attachments' => $attachments
         ];
 
-        //$this->curl_service->performAction(env('SLACK_WEBHOOK_URL'), 'post', $response_data, $headers);
+        //$this->web_service->performCurlAction(env('SLACK_WEBHOOK_URL'), 'post', $response_data, $headers);
 
         return response()->json($response_data, 200);
     }
@@ -325,7 +339,7 @@ class BotController extends Controller
             'attachments' => $attachments
         ];
 
-        //$this->curl_service->performAction(env('SLACK_WEBHOOK_URL'), 'post', $response_data, $headers);
+        //$this->web_service->performCurlAction(env('SLACK_WEBHOOK_URL'), 'post', $response_data, $headers);
 
         return response()->json($response_data, 200);
     }
@@ -421,7 +435,7 @@ class BotController extends Controller
             'attachments' => $attachments
         ];
 
-        //$this->curl_service->performAction(env('SLACK_WEBHOOK_URL'), 'post', $response_data, $headers);
+        //$this->web_service->performCurlAction(env('SLACK_WEBHOOK_URL'), 'post', $response_data, $headers);
 
         return response()->json($response_data, 200);
     }
