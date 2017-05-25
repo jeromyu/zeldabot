@@ -59,8 +59,14 @@ class DataFormatService
 
 	public function getHtmlH1Text($html)
 	{
-		preg_match_all('@<h1.*>(.*)<\/h1>@U', $html, $matches);
+		//$total = [];
 
+		preg_match_all('@<h1.*>(.*)<\/h1>@U', $html, $matches);
+		/*$total = array_merge($total, $matches[1]);
+		preg_match_all('@<h2.*>(.*)<\/h2>@U', $html, $matches);
+		$total = array_merge($total, $matches[1]);
+		dd($total);
+		*/
 		return strtolower(implode(' ', $matches[1]));
 	}
 }
