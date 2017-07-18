@@ -15,6 +15,10 @@ $app->get('/', function () use ($app) {
     return $app->version();
 });
 
+$app->get('weebhook', function(){
+    return "Congratulations for install ZeldaBot!";
+});
+
 $app->group(['middleware' => 'verify.token'], function () use ($app) {
 	$app->post('/webhook', 'BotController@webhook');
 	$app->post('/addlink', 'BotController@addlink');
