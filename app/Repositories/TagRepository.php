@@ -43,12 +43,13 @@ class TagRepository extends BaseRepository
 
 	public function getTagsInGroup($tag_names)
 	{
-		//return $this->model->whereIn('name', $tag_names)->pluck('id')->toArray();
-		return $this->model->where(function($query) use ($tag_names){
+		return $this->model->whereIn('name', $tag_names)->pluck('id')->toArray();
+		/*return $this->model->where(function($query) use ($tag_names){
 			foreach ($tag_names as $tag) {
 				$query->where('name', 'like', '%' . $tag . '%');
 			}
-		});
+		})->pluck('id')->toArray();
+		*/
 	}
 
 	public function getTagsInIdsGroup($tag_ids)

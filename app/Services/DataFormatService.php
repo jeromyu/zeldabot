@@ -4,7 +4,7 @@ namespace App\Services;
 
 class DataFormatService
 {
-	protected $exceptions = ["$", "'"];
+	protected $exceptions = ["$", "'", '"'];
 
 	public function getExceptions()
 	{
@@ -44,7 +44,10 @@ class DataFormatService
 
 	public function getTags($command_text)
 	{
-		$arr = explode(" ", preg_replace('/\s+/', " ", $command_text));
+		$formatted = preg_replace('/\s+/', " ", $command_text);
+		$formatted = htmlentities($formatted, null, 'utf-8');
+		$formatted = str_replace("&nbsp;", " ", $formatted);
+		$arr = explode(' ', $formatted);
 
 		array_walk($arr, function(&$element, $key) use (&$arr){
 			if (!$element) {
@@ -67,6 +70,6 @@ class DataFormatService
 		$total = array_merge($total, $matches[1]);
 		dd($total);
 		*/
-		return strtolower(implode(' ', $matches[1]));
+		return $this->escapeContent(strtolower(implode(' ', $matches[1])));
 	}
 }

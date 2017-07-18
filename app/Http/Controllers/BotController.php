@@ -96,6 +96,7 @@ class BotController extends Controller
         if (empty($command_entities['tags'])) {
             $html = $this->web_service->scrapWeb($command_entities['link']);
             $key_words = $this->format_service->getHtmlH1Text($html);
+
             $tags = $this->format_service->getTags($key_words);
             $auto_added_tags = true;
         } else {
@@ -303,6 +304,7 @@ class BotController extends Controller
         foreach ($links as $link) {
                 $attachments[] = [
                     //'pretext' => $data['user_name'] . '\'s links:',
+                    'callback_id' => 'link_added',
                     'color' => '#1a5dc9',
                     'fields' => [
                         [
@@ -313,6 +315,15 @@ class BotController extends Controller
                         [
                             'title' => 'Tags:',
                             'value' => implode(' ', $link->tags()->pluck('name')->toArray())
+                        ]
+                    ],
+                    'actions' => [
+                        [
+                            'name' =>  'favorite',
+                            'text' =>  '★ Add to favorites',
+                            'type' =>  'button',
+                            'value' =>  $link->id,
+                            'style' => 'primary'
                         ]
                     ]
                     /*
